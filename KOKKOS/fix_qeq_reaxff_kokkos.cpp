@@ -836,8 +836,8 @@ void FixQEqReaxFFKokkos<DeviceType>::calculate_q()
   const F_FLOAT s_sum = sum_all.v[0];
   const F_FLOAT t_sum = sum_all.v[1];
 
-  // u = s_sum / t_sum;
-  delta = s_sum/t_sum;
+  // u = (s_sum - qtot) / t_sum;
+  delta = (s_sum - qtot)/t_sum;
 
   // q[i] = s[i] - u * t[i];
   Kokkos::parallel_for(Kokkos::RangePolicy<DeviceType,TagQEqCalculateQ>(0,nn),*this);

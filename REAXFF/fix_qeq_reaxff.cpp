@@ -74,7 +74,7 @@ FixQEqReaxFF::FixQEqReaxFF(LAMMPS *lmp, int narg, char **arg) :
   imax = 200;
   maxwarn = 1;
 
-  if ((narg < 8) || (narg > 12)) error->all(FLERR,"Illegal fix qeq/reaxff command");
+  if (narg < 8) error->all(FLERR,"Illegal fix qeq/reaxff command");
 
   nevery = utils::inumeric(FLERR,arg[3],false,lmp);
   if (nevery <= 0) error->all(FLERR,"Illegal fix qeq/reaxff command");
@@ -83,6 +83,8 @@ FixQEqReaxFF::FixQEqReaxFF(LAMMPS *lmp, int narg, char **arg) :
   swb = utils::numeric(FLERR,arg[5],false,lmp);
   tolerance = utils::numeric(FLERR,arg[6],false,lmp);
   pertype_option = utils::strdup(arg[7]);
+
+  qtot = 0.0;
 
   // dual CG support only available for OPENMP variant
   // check for compatibility is in Fix::post_constructor()
@@ -97,6 +99,11 @@ FixQEqReaxFF::FixQEqReaxFF(LAMMPS *lmp, int narg, char **arg) :
       if (iarg+1 > narg-1)
         error->all(FLERR,"Illegal fix {} command", style);
       imax = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+      iarg++;
+    } else if (strcmp(arg[iarg],"qtot") == 0) {
+      if (iarg+1 > narg-1)
+        error->all(FLERR,"Illegal fix {} command", style);
+      qtot = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       iarg++;
     } else error->all(FLERR,"Illegal fix {} command", style);
     iarg++;
@@ -411,7 +418,7 @@ void FixQEqReaxFF::init()
   }
   MPI_Allreduce(&qsum_local,&qsum,1,MPI_DOUBLE,MPI_SUM,world);
 
-  if ((comm->me == 0) && (fabs(qsum) > QSUMSMALL))
+  if ((comm->me == 0) && (fabs(qsum - qtot) > QSUMSMALL))
     error->warning(FLERR,"Fix {} group is not charge neutral, net charge = {:.8}", style, qsum);
 
   // get pointer to fix efield if present. there may be at most one instance of fix efield in use.
@@ -843,7 +850,7 @@ void FixQEqReaxFF::calculate_Q()
 
   s_sum = parallel_vector_acc(s, nn);
   t_sum = parallel_vector_acc(t, nn);
-  u = s_sum / t_sum;
+  u = (s_sum - qtot) / t_sum;
 
   for (ii = 0; ii < nn; ++ii) {
     i = ilist[ii];
